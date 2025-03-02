@@ -3,7 +3,7 @@ from pydantic import ValidationError
 from api.schema import DHTable
 import uuid
 import os
-import json  # 🔹 Add JSON import
+import json  # 🔹 Required for JSON conversion
 import asyncpg  # PostgreSQL async client
 
 app = FastAPI()
@@ -23,8 +23,8 @@ async def add_dh_table(dh_table: DHTable):
         # Generate a unique ID
         dh_id = str(uuid.uuid4())
 
-        # Convert joints list to JSON string
-        joints_json = json.dumps(dh_table.joints)  # 🔹 Convert list to JSON string
+        # Convert Pydantic models to dictionaries before JSON conversion
+        joints_json = json.dumps([joint.dict() for joint in dh_table.joints])  # 🔹 Fixed conversion
 
         # Store in PostgreSQL
         conn = await get_db_connection()
@@ -32,7 +32,7 @@ async def add_dh_table(dh_table: DHTable):
             """
             INSERT INTO dh_tables (id, name, joints) VALUES ($1, $2, $3)
             """,
-            dh_id, dh_table.name, joints_json  # 🔹 Pass JSON string instead of list
+            dh_id, dh_table.name, joints_json  # 🔹 Now correctly serialized
         )
         await conn.close()
 
