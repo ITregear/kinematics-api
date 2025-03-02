@@ -1,28 +1,35 @@
 from fastapi import FastAPI, HTTPException, Query
-from typing import Optional
-from db.database import DATABASE
+import os
+import asyncpg  # PostgreSQL async client
 
 app = FastAPI()
 
+# Get Neon database URL
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+async def get_db_connection():
+    return await asyncpg.connect(DATABASE_URL)
+
 @app.get("/api/get_dh")
-def get_dh_table(id: Optional[str] = Query(None), name: Optional[str] = Query(None)):
-    # Case 1: No parameters, return all DH tables
-    if id is None and name is None:
-        return {"dh_tables": list(DATABASE.values())}
+async def get_dh_table(id: str = Query(None), name: str = Query(None)):
+    conn = await get_db_connection()
 
-    # Case 2: Search by ID
     if id:
-        dh_table = DATABASE.get(id)
-        if dh_table:
-            return dh_table
-        else:
-            raise HTTPException(status_code=404, detail="DH table not found with ID: " + id)
+        dh_table = await conn.fetchrow("SELECT * FROM dh_tables WHERE id = $1", id)
+        await conn.close()
+        if not dh_table:
+            raise HTTPException(status_code=404, detail="DH table not found")
+        return dict(dh_table)
 
-    # Case 3: Search by name
     if name:
-        for dh_id, dh_table in DATABASE.items():
-            if dh_table["name"] == name:
-                return dh_table
-        raise HTTPException(status_code=404, detail="DH table not found with name: " + name)
+        dh_table = await conn.fetchrow("SELECT * FROM dh_tables WHERE name = $1", name)
+        await conn.close()
+        if not dh_table:
+            raise HTTPException(status_code=404, detail="DH table not found")
+        return dict(dh_table)
 
-    raise HTTPException(status_code=400, detail="Invalid query parameters")
+    # Fetch all DH tables
+    dh_tables = await conn.fetch("SELECT * FROM dh_tables")
+    await conn.close()
+    
+    return {"dh_tables": [dict(table) for table in dh_tables]}
