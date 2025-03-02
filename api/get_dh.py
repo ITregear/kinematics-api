@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Query
 import os
+import json  # 🔹 Required for JSON deserialization
 import asyncpg  # PostgreSQL async client
 
 app = FastAPI()
@@ -19,17 +20,34 @@ async def get_dh_table(id: str = Query(None), name: str = Query(None)):
         await conn.close()
         if not dh_table:
             raise HTTPException(status_code=404, detail="DH table not found")
-        return dict(dh_table)
+        return {
+            "id": dh_table["id"],
+            "name": dh_table["name"],
+            "joints": json.loads(dh_table["joints"])  # 🔹 Convert JSON string back to list
+        }
 
     if name:
         dh_table = await conn.fetchrow("SELECT * FROM dh_tables WHERE name = $1", name)
         await conn.close()
         if not dh_table:
             raise HTTPException(status_code=404, detail="DH table not found")
-        return dict(dh_table)
+        return {
+            "id": dh_table["id"],
+            "name": dh_table["name"],
+            "joints": json.loads(dh_table["joints"])  # 🔹 Convert JSON string back to list
+        }
 
     # Fetch all DH tables
     dh_tables = await conn.fetch("SELECT * FROM dh_tables")
     await conn.close()
-    
-    return {"dh_tables": [dict(table) for table in dh_tables]}
+
+    return {
+        "dh_tables": [
+            {
+                "id": table["id"],
+                "name": table["name"],
+                "joints": json.loads(table["joints"])  # 🔹 Convert JSON string back to list
+            }
+            for table in dh_tables
+        ]
+    }
