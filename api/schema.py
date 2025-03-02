@@ -6,7 +6,7 @@ class Joint(BaseModel):
     d: float
     a: float
     alpha: float
-    joint_type: str = Field(..., regex="^(rotational|prismatic)$")  # Must be one of these
+    joint_type: str = Field(..., pattern="^(rotational|prismatic)$")
     limits: Dict[str, float]  # Must contain "min" and "max"
 
 class DHTable(BaseModel):
