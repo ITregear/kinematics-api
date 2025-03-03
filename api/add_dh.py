@@ -3,19 +3,29 @@ from pydantic import ValidationError
 from api.schema import DHTable
 import uuid
 import os
-import json  # 🔹 Required for JSON conversion
-import asyncpg  # PostgreSQL async client
+import json
+import asyncpg
 
 app = FastAPI()
 
-# Get Neon database URL from Vercel environment variables
+# Get Neon database URL from environment variable
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 async def get_db_connection():
+    """Establish a connection to the database."""
     return await asyncpg.connect(DATABASE_URL)
 
 @app.post("/api/add_dh")
 async def add_dh_table(dh_table: DHTable):
+    """
+    Add a new DH table to the database.
+
+    Args:
+        dh_table (DHTable): The DH table data to be added.
+
+    Returns:
+        dict: A message indicating success and the ID of the new DH table.
+    """
     try:
         # Validate input using Pydantic
         dh_table = DHTable(**dh_table.dict())
@@ -23,8 +33,8 @@ async def add_dh_table(dh_table: DHTable):
         # Generate a unique ID
         dh_id = str(uuid.uuid4())
 
-        # Convert Pydantic models to dictionaries before JSON conversion
-        joints_json = json.dumps([joint.dict() for joint in dh_table.joints])  # 🔹 Fixed conversion
+        # Convert joints to JSON format
+        joints_json = json.dumps([joint.dict() for joint in dh_table.joints])
 
         # Store in PostgreSQL
         conn = await get_db_connection()
@@ -32,7 +42,7 @@ async def add_dh_table(dh_table: DHTable):
             """
             INSERT INTO dh_tables (id, name, joints) VALUES ($1, $2, $3)
             """,
-            dh_id, dh_table.name, joints_json  # 🔹 Now correctly serialized
+            dh_id, dh_table.name, joints_json
         )
         await conn.close()
 
