@@ -76,4 +76,8 @@ async def fwd_kin(
             transformation_matrices.append(np.array(response.json()))
 
     # Compute the final transformation matrix
-    final_matrix = np.eye
+    final_matrix = np.eye(4)
+    for matrix in transformation_matrices:
+        final_matrix = np.dot(final_matrix, matrix)
+
+    return {"end_effector_transform": final_matrix.tolist()}
