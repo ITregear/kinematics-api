@@ -21,13 +21,6 @@ async def fwd_kin(
 ):
     """
     Computes forward kinematics for a given manipulator using its stored DH table.
-
-    Parameters:
-    - `id` or `name`: Identifier for the stored DH table (only one is required).
-    - `joint_values`: List of joint positions (repeated parameter format).
-
-    Returns:
-    - 4x4 transformation matrix representing the end-effector's pose.
     """
 
     logging.info(f"Received request for fwd_kin with name={name}, id={id}, joint_values={joint_values}")
@@ -37,17 +30,32 @@ async def fwd_kin(
 
     # Retrieve DH table
     async with httpx.AsyncClient() as client:
-        params = {"id": id} if id else {"name": name}
-        dh_response = await client.get(f"{API_BASE_URL}/api/get_dh", params=params)
+        try:
+            params = [("id", id)] if id else [("name", name)]  # ✅ Ensure correct parameter formatting
+            dh_response = await client.get(f"{API_BASE_URL}/api/get_dh", params=params)
+            
+            # Log the full response for debugging
+            logging.info(f"get_dh response: {dh_response.status_code} - {dh_response.text}")
 
-    if dh_response.status_code != 200:
-        logging.error(f"Failed to retrieve DH table: {dh_response.text}")
-        raise HTTPException(status_code=dh_response.status_code, detail="Failed to retrieve DH table.")
+            if dh_response.status_code != 200:
+                raise HTTPException(status_code=dh_response.status_code, detail=f"Failed to retrieve DH table: {dh_response.text}")
 
-    dh_table = dh_response.json()
-    joints = dh_table.get("joints", [])
+            dh_table = dh_response.json()
 
+        except Exception as e:
+            logging.error(f"Error fetching DH table: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error retrieving DH table.")
+
+    # Ensure 'joints' field exists
+    if "joints" not in dh_table or not isinstance(dh_table["joints"], list):
+        logging.error(f"Invalid DH table format: {dh_table}")
+        raise HTTPException(status_code=500, detail="DH table is missing the 'joints' field or has an invalid format.")
+
+    joints = dh_table["joints"]
+
+    # Validate the number of joint values
     if len(joint_values) != len(joints):
+        logging.error(f"Mismatch: {len(joint_values)} joint values vs {len(joints)} joints in DH table")
         raise HTTPException(status_code=400, detail="Number of joint values must match the number of joints.")
 
     # Validate joint limits
